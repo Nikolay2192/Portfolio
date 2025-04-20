@@ -157,7 +157,7 @@ export type User = {
   __typename?: 'User';
   email: Scalars['EmailAddress']['output'];
   id: Scalars['ID']['output'];
-  token: Scalars['String']['output'];
+  token?: Scalars['String']['output'];
   username: Scalars['String']['output'];
 };
 

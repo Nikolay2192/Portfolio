@@ -5,4 +5,5 @@ export const mapAuthorToGraphQL = (author: Author): AuthorType => ({
     id: author.id,
     slug: author.slug,
     name: author.name,
+    __typename: 'Author',
 })

@@ -3,6 +3,7 @@ import { AppDataSource } from "../../../config/data-source.js";
 import { EmailAddressResolver } from "graphql-scalars";
 import { User } from "../../../entity/User.js";
 import { registerUserSchema } from "../../../validation/auth/registerUserSchema.js";
+import { mapUserToGraphQL } from "../../mappers/userMapper/userMapper.js";
 import { JWT_SECRET } from "../../../config/data-source.js";
 import jwt from 'jsonwebtoken';
 import bcrypt from 'bcrypt';
@@ -39,8 +40,7 @@ export const userResolvers = {
                 throw new ApolloError("User does not exist", "USER_NOT_FOUND");
             }
 
-            return foundUser;
-
+            return mapUserToGraphQL(foundUser);
         },
         getAllUsers: async (_: any) => {
 
@@ -51,7 +51,7 @@ export const userResolvers = {
                 throw new ApolloError('No registered users', "NO_USERS_FOUND");
             }
 
-            return allUsers;
+            return allUsers.map(mapUserToGraphQL);
         }
     },
     Mutation: {
@@ -94,7 +94,10 @@ export const userResolvers = {
                 { expiresIn: '30m' }
             );
 
-            return { id: newUser.id, username: newUser.username, email: newUser.email, token };
+            return {
+                user: mapUserToGraphQL(newUser),
+                token
+            };
         },
         loginUser: async (_: any, { input }: loginUserProps) => {
             const userRepository = AppDataSource.getRepository(User);
@@ -117,7 +120,10 @@ export const userResolvers = {
                 { expiresIn: '30m' }
             );
 
-            return { id: userAccount.id, email: userAccount.email, username: userAccount.username, token};
+            return {
+                user: mapUserToGraphQL(userAccount),
+                token
+            };
         }
     }
 }

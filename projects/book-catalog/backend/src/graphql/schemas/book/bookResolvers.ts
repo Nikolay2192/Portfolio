@@ -106,7 +106,7 @@ export const bookResolvers = {
 
                 // await redis.del('books');
                 
-                return existingBook;
+                return mapBookToGraphQL(existingBook);
 
               } catch (error) {
                 console.error("Error creating book:", error);
@@ -146,7 +146,7 @@ export const bookResolvers = {
     
                 await bookRepository.save(existingBook);
     
-                return existingBook;
+                return mapBookToGraphQL(existingBook);
             } catch (error) {
                 console.log("EditBook error!", error);
             }
