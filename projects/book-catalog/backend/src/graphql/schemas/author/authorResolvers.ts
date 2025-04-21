@@ -8,29 +8,32 @@ import { mapAuthorToGraphQL } from "../../mappers/authorMapper/authorMapper.js";
 
 export const authorResolvers = {
     Query: {
-        booksByAuthor: async (_: unknown, { authorId }: QueryBooksByAuthorArgs): Promise<BookTypes[] | null> => {
+        booksByAuthor: async (_: unknown, { authorId }: QueryBooksByAuthorArgs): Promise<BookTypes[]> => {
             const booksRepository = AppDataSource.getRepository(Book);
 
-            const books = await booksRepository.findBy({ author: { id: authorId } });
+            const books = await booksRepository.find({
+                where: { author: { id: authorId } },
+                relations: ['author'],
+            });
 
-            if (!books || books.length === 0) {
+            if (books.length === 0) {
                 throw new ApolloError("Author has no books!", "NO_BOOKS_FOUND");
             }
 
             return books.map(mapBookToGraphQL);
         },
-        authors: async (_: unknown): Promise<AuthorTypes[] | null> => {
+        authors: async (_: unknown): Promise<AuthorTypes[]> => {
             const authorRepository = AppDataSource.getRepository(Author);
 
             const authors = await authorRepository.find();
 
-            if (!authors || authors.length === 0) {
+            if (authors.length === 0) {
                 throw new ApolloError("There aren't any authors", "AUTHORS_NOT_FOUND")
             }
 
             return authors.map(mapAuthorToGraphQL);
         },
-        author: async (_: unknown, { id }: QueryAuthorArgs): Promise<AuthorTypes | null> => {
+        author: async (_: unknown, { id }: QueryAuthorArgs): Promise<AuthorTypes> => {
             const authorRepository = AppDataSource.getRepository(Author);
 
             const author = await authorRepository.findOneBy({ id });

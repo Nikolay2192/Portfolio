@@ -1,10 +1,9 @@
-import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, Unique, Relation, Index } from "typeorm";
+import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, Relation, Index } from "typeorm";
 import { BookType } from "../enums/bookTypeEnum.js";
 import { Library } from "./Library.js";
 import { Author } from "./Author.js";
 
 @Entity('books')
-@Unique(['title', 'author', 'library'])
 export class Book {
     @PrimaryGeneratedColumn('uuid')
 

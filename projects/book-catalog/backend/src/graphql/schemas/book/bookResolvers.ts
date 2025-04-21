@@ -11,7 +11,7 @@ import { mapBookToGraphQL } from "../../mappers/bookMapper/bookMapper.js";
 
 export const bookResolvers = {
     Query: {
-        books: async (_: unknown, __: unknown): Promise<BookType[] | null> => {
+        books: async (_: unknown, __: unknown): Promise<BookType[]> => {
             // TODO: Enable Redis caching once Redis is set up on Windows
             // const cachedBooks = await redis.get('books');
 
@@ -21,9 +21,11 @@ export const bookResolvers = {
             // }
 
             const bookRepository = AppDataSource.getRepository(Book);
-            const books = await bookRepository.find();
+            const books = await bookRepository.find({
+                relations: ['author']
+            });
 
-            if (!books || books.length === 0) {
+            if (books.length === 0) {
                 throw new ApolloError("No books found", "NO_BOOKS_AVAILABLE");
             }
 
@@ -33,20 +35,25 @@ export const bookResolvers = {
 
             return books.map(mapBookToGraphQL);
         },
-        booksByType: async (_: unknown, { type }: QueryBooksByTypeArgs): Promise<BookType[] | null> => {
+        booksByType: async (_: unknown, { type }: QueryBooksByTypeArgs): Promise<BookType[]> => {
             const bookRepository = AppDataSource.getRepository(Book);
-            const books = await bookRepository.findBy({ type });
+            const books = await bookRepository.find({
+                where: {
+                    type
+                },
+                relations: ['author']
+            });
 
-            if (!books || books.length === 0) {
+            if (books.length === 0) {
                 throw new ApolloError('There are no books with this type', "NO_BOOKS_WITH_THIS_TYPE");
             }
 
             return books.map(mapBookToGraphQL);
 
-        } ,
-        book: async (_: unknown, { slug }: QueryBookArgs): Promise<BookType | null> => {
+        },
+        book: async (_: unknown, { slug }: QueryBookArgs): Promise<BookType> => {
             const bookRepository = AppDataSource.getRepository(Book);
-            const book = await bookRepository.findOneBy({ slug });
+            const book = await bookRepository.findOne({ where: { slug }, relations: ['author'] },)
 
             if (!book) {
                 throw new ApolloError("Book does not exist", "BOOK_NOT_FOUND");
@@ -56,134 +63,145 @@ export const bookResolvers = {
         }
     },
     Mutation: {
-        createBook: async (_: unknown, { input }: MutationCreateBookArgs) => {
-            const bookRepository = AppDataSource.getRepository(Book);
-            const libraryRepositry = AppDataSource.getRepository(Library);
-            const authorRepository = AppDataSource.getRepository(Author);
+        createBook: async (_: unknown, { input }: MutationCreateBookArgs): Promise<BookType> => {
             const { title, author, type } = input;
             const authorName = author.name;
+            const authorNameSlug = slugify(authorName, { strict: true, remove: /[0-9]/g },);
 
             try {
-                let author = await authorRepository.findOneBy({ name: authorName });
+                const resultCreatingBook = await AppDataSource.transaction(async (manager) => {
 
-                const authorNameSlug = slugify(authorName, { strict: true, remove: /[0-9]/g },);
-    
-                if (!author) {
-                    author = authorRepository.create({ name: authorName, slug: authorNameSlug });
-                    await authorRepository.save(author);
-                }
-    
-                let library = await libraryRepositry.findOneBy({ type });
-                
-                if (!library) {
-                    library = libraryRepositry.create({
-                        type,
-                    });
-                    await libraryRepositry.save(library);
-                }
-                
-                let existingBook = await bookRepository.findOne({
-                    where: {
-                        title,
-                        author: { id: author.id },
-                        library: { id: library.id }
-                    },
-                    relations: ["author", "library"]
-                });
+                    let author = await manager.findOneBy(Author, { name: authorName });
 
-                const titleSlug = slugify(title, { lower: true, strict: true });
-                
-                if (!existingBook) {
-                    existingBook = bookRepository.create({
-                        title,
-                        slug: titleSlug,
-                        type,
-                        author,
-                        library
-                    });
-                    await bookRepository.save(existingBook);
-                }
-
-                // await redis.del('books');
-                
-                return mapBookToGraphQL(existingBook);
-
-              } catch (error) {
-                console.error("Error creating book:", error);
-                throw new ApolloError("Failed to create book", "CREATE_BOOK_ERROR");
-              }
-        },
-        editBook: async (_: any, { input }: MutationEditBookArgs ) => {
-            const bookRepository = AppDataSource.getRepository(Book);
-            const libraryRepositry = AppDataSource.getRepository(Library);
-
-            try {
-                const existingBook = await bookRepository.findOne({
-                    where: { id: input.id },
-                    relations: ["library", "author"],
-                });
-    
-                if (!existingBook) {
-                    throw new ApolloError("Book does not exist", "BOOK_NOT_FOUND");
-                }
-    
-                if (input.title) {
-                    existingBook.title = input.title;
-                }
-    
-                if (input.type && existingBook.library.type !== input.type) {
-                    let library = await libraryRepositry.findOneBy({ type: input.type });
-                    
-                    if (!library) {
-                        library = libraryRepositry.create({
-                            type: input.type
-                        })
-                        await libraryRepositry.save(library);
+                    if (!author) {
+                        author = manager.create(Author, { name: authorName, slug: authorNameSlug });
+                        await manager.save(author);
                     }
-                    existingBook.type = input.type;
-                    existingBook.library = library;
-                }
-    
-                await bookRepository.save(existingBook);
-    
-                return mapBookToGraphQL(existingBook);
+
+                    let library = await manager.findOneBy(Library, { type });
+
+                    if (!library) {
+                        library = manager.create(Library, { type });
+                        await manager.save(Library, library);
+                    }
+
+                    let book = await manager.findOne(Book, {
+                        where: {
+                            title,
+                            author: { id: author.id },
+                            library: { id: library.id }
+                        },
+                    });
+
+                    const titleSlug = slugify(title, { lower: true, strict: true });
+
+                    if (!book) {
+                        book = manager.create(Book, {
+                            title,
+                            slug: titleSlug,
+                            type,
+                            author,
+                            library
+                        });
+                        await manager.save(Book, book);
+                    }
+
+                    // await redis.del('books');
+
+                    return mapBookToGraphQL(book);
+                })
+
+                return resultCreatingBook;
+
             } catch (error) {
-                console.log("EditBook error!", error);
+                if (process.env.NODE_ENV !== 'production' && error instanceof Error) {
+                    console.error("Error creating book:", error.message);
+                }
+                throw new ApolloError("Failed to create book", "CREATE_BOOK_ERROR");
             }
         },
-        deleteBook: async (_: any, { id }: MutationDeleteBookArgs): Promise<void | null> => {
-            const bookRepository = AppDataSource.getRepository(Book);
-            const libraryRepository = AppDataSource.getRepository(Library);
-
+        editBook: async (_: any, { input }: MutationEditBookArgs): Promise<BookType> => {
             try {
-                const bookToRemove = await bookRepository.findOne({
-                    where: { id },
-                    relations: ['library']
-                });
-    
-                if (!bookToRemove) {
-                    throw new ApolloError('Book does not exist', "BOOK_NOT_FOUND");
-                }
-                
-                const library = bookToRemove.library;
-                
-                await bookRepository.remove(bookToRemove);
-    
-                if (library) {
-                    const libraryWithBooks = await libraryRepository.findOne({
-                        where: { id: library.id },
-                        relations: ['books'],
+
+                const resultEditingBook = await AppDataSource.transaction(async (manager) => {
+                    const existingBook = await manager.findOne(Book, {
+                        where: { id: input.id },
+                        relations: ["library", "author"],
                     });
-        
-                    if (libraryWithBooks && libraryWithBooks.books.length === 0) {
-                        await libraryRepository.remove(libraryWithBooks);
+    
+                    if (!existingBook) {
+                        throw new ApolloError("Book does not exist", "BOOK_NOT_FOUND");
                     }
+    
+                    if (input.title && existingBook.title !== input.title) {
+                        existingBook.title = input.title;
+                        existingBook.slug = slugify(input.title, { lower: true, strict: true });
+                    }
+    
+                    if (input.type && existingBook.library.type !== input.type) {
+                        let library = await manager.findOneBy(Library, { type: input.type });
+    
+                        if (!library) {
+                            library = manager.create(Library, {
+                                type: input.type
+                            })
+                            await manager.save(Library, library);
+                        }
+                        existingBook.library = library;
+                    }
+    
+                    await manager.save(Book, existingBook);
+    
+                    return mapBookToGraphQL(existingBook);
+                })
+                return resultEditingBook;
+            } catch (error) {
+                if (process.env.NODE_ENV !== 'production' && error instanceof Error) {
+                    console.error('Error editing book', error.message);
                 }
 
-              } catch (error) {
-                console.error("Error deleting book:", error);
+                throw new ApolloError("Failed to edit book", "EDIT_BOOK_ERROR");
+            }
+        },
+        deleteBook: async (_: any, { id }: MutationDeleteBookArgs): Promise<BookType> => {
+            try {
+                const deleteBookResult = await AppDataSource.transaction(async (manager) => {
+                    const bookToRemove = await manager.findOne(Book, {
+                        where: { id },
+                        relations: ['library']
+                    });
+
+                    if (!bookToRemove) {
+                        throw new ApolloError('Book does not exist', "BOOK_NOT_FOUND");
+                    }
+
+                    const deletedBook = mapBookToGraphQL(bookToRemove);
+                    const library = bookToRemove.library;
+
+                    await manager.remove(bookToRemove);
+
+                    if (library) {
+                        const libraryWithBooks = await manager.findOne(Library, {
+                            where: { id: library.id },
+                            relations: ['books'],
+                        });
+
+                        if (libraryWithBooks && libraryWithBooks.books.length === 0) {
+                            await manager.remove(libraryWithBooks);
+                        }
+                    }
+
+                    return deletedBook;
+                })
+
+                return deleteBookResult;
+            } catch (error) {
+                if (process.env.NODE_ENV !== 'production' && error instanceof Error) {
+                    console.error(`Error occurred while deleting book: ${error.message}`);
+                }
+
                 throw new ApolloError("Failed to delete book", "DELETE_BOOK_ERROR");
-              }
+            }
         }
     }
 }
