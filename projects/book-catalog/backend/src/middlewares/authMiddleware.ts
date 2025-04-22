@@ -1,22 +1,29 @@
 import { JWT_SECRET } from "../config/data-source.js";
+import type { Context, Next } from "koa";
 import jwt from 'jsonwebtoken';
 
-const authMiddleware = async (ctx: any, next: Function) => {
-    const token = ctx.headers['authorization']?.split(' ')[1];
+const authMiddleware = async (ctx: Context, next: Next) => {
+    const authHeader = ctx.headers['authorization'];
 
-    if (!token) {
+    if (!authHeader || !authHeader.startsWith("Bearer ")) {
         ctx.state.user = null;
-        return next();
+        return await next();
     }
+
+    const token = authHeader.split(' ')[1];
 
     try {
-        ctx.state.user = jwt.verify(token, JWT_SECRET);
+        const decoded = jwt.verify(token, JWT_SECRET);
+        ctx.state.user = decoded;
+        await next();
     } catch (err) {
-        ctx.state.user = null;
-        throw new Error('UNAUTHORIZED_ACCESS');
+        ctx.status = 401;
+        ctx.body = {
+            success: false,
+            error: "Unauthorized",
+            message: "Invalid or expired token",
+        };
     }
-
-    return next();
 }
 
 export default authMiddleware;

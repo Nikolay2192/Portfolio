@@ -1,5 +1,5 @@
 import { gql } from "apollo-server-koa";
-import { BookType } from "../../enums/bookTypeEnum";
+import { BookType } from "../../graphql-types/graphql";
 
 export const bookTypeEnum = gql`
   enum BookType {

@@ -1,7 +1,8 @@
 import { gql } from "apollo-server-koa";
+import { EmailAddressTypeDefinition } from "graphql-scalars";
 
 export const userTypes = gql`
-    scalar EmailAddress
+    ${EmailAddressTypeDefinition}
 
     input AddNewUser {
         username: String!

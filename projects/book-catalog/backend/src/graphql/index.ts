@@ -7,18 +7,22 @@ import { authorTypes } from "./schemas/author/authorTypes.js";
 import { authorResolvers } from "./schemas/author/authorResolvers.js";
 import { userTypes } from "./schemas/user/userTypes.js";
 import { userResolvers } from "./schemas/user/userResolvers.js";
+import { EmailAddressResolver } from "graphql-scalars";
 
 export const typeDefs = [
     bookTypeEnum,
     bookTypes,
     libraryTypes,
     authorTypes,
-    userTypes
+    userTypes,
 ];
 
 export const resolvers = [
     bookResolvers,
     libraryResolvers,
     authorResolvers,
-    userResolvers
+    userResolvers,
+    {
+        EmailAddress: EmailAddressResolver
+    }
 ];

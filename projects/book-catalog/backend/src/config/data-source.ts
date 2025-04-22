@@ -10,7 +10,7 @@ dotenv.config({
 });
 
 if (!process.env.JWT_SECRET) throw new Error("Missing JWT_SECRET");
-if (!process.env.DB_HOST) throw new Error("Missing DB_HOST");
+if (!process.env.HOST) throw new Error("Missing HOST");
 if (!process.env.DB_PORT) throw new Error("Missing DB_PORT");
 if (!process.env.DB_USERNAME) throw new Error("Missing DB_USERNAME");
 if (!process.env.DB_PASSWORD) throw new Error("Missing DB_PASSWORD");
@@ -20,7 +20,7 @@ export const JWT_SECRET = process.env.JWT_SECRET as string;
 
 export const AppDataSource = new DataSource({
     type: 'postgres',
-    host: process.env.DB_HOST,
+    host: process.env.HOST,
     port: Number(process.env.DB_PORT),
     username: process.env.DB_USERNAME,
     password: process.env.DB_PASSWORD,

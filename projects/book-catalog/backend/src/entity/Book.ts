@@ -17,7 +17,7 @@ export class Book {
 
     slug!: string;
 
-    @ManyToOne(() => Author, author => author.books)
+    @ManyToOne(() => Author, author => author.books, { onDelete: 'SET NULL' })
 
     author!: Author;
 

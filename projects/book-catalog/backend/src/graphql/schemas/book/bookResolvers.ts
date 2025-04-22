@@ -3,7 +3,6 @@ import { AppDataSource } from "../../../config/data-source.js";
 import { Book } from "../../../entity/Book.js";
 import { Library } from "../../../entity/Library.js";
 import { Author } from "../../../entity/Author.js";
-// import { RedisProps } from "../../../types/types.js";
 import slugify from "slugify";
 import { QueryBooksByTypeArgs, Book as BookType, QueryBookArgs, MutationCreateBookArgs, MutationEditBookArgs, MutationDeleteBookArgs } from "../../../graphql-types/graphql.js";
 import { mapBookToGraphQL } from "../../mappers/bookMapper/bookMapper.js";
@@ -13,12 +12,6 @@ export const bookResolvers = {
     Query: {
         books: async (_: unknown, __: unknown): Promise<BookType[]> => {
             // TODO: Enable Redis caching once Redis is set up on Windows
-            // const cachedBooks = await redis.get('books');
-
-            // if (cachedBooks) {
-            //     console.log('Serving from redis cache');
-            //     return JSON.parse(cachedBooks);
-            // }
 
             const bookRepository = AppDataSource.getRepository(Book);
             const books = await bookRepository.find({
@@ -29,9 +22,6 @@ export const bookResolvers = {
                 throw new ApolloError("No books found", "NO_BOOKS_AVAILABLE");
             }
 
-            // await redis.set('books', JSON.stringify(books), {
-            //     EX: 1800
-            // });
 
             return books.map(mapBookToGraphQL);
         },
@@ -106,7 +96,6 @@ export const bookResolvers = {
                         await manager.save(Book, book);
                     }
 
-                    // await redis.del('books');
 
                     return mapBookToGraphQL(book);
                 })
